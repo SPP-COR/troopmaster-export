@@ -3,12 +3,14 @@ import os, re
 from parse import *
 import csv
 import logging
-#logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
-logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+#logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-# filepath = 'IndividualHistoryReport-103144_c.txt'
-filepath = 'ColinT_IHR.txt'
+#filepath = 'IndividualHistoryReport-103144_c.txt'
+filepath = 'JoeColin.txt'
+# filepath = 'ColinT_IHR.txt'
 filepathout = 'SB_IndividualHistoryReport.csv'
+
 
 with open(filepath) as fp:
  with open(filepathout,'w') as csvfile:
@@ -23,11 +25,13 @@ with open(filepath) as fp:
    num_processed=0
    num_partial_rank=0
    scoutdata = dict()
+   phase = "name"
    for cnt, line in enumerate(fp):
        print("Processing {}: {}".format(cnt, line))
        if line.startswith("Name:"):
           num_scouts +=1
           scoutdata = dict()
+          phase = "bsaid"
           p = parse("Name: {}, {} Email:{}", line)
           if p is None:
             logging.error("Coulnd't find name for line %s - using 'Joe Scout'",
@@ -41,7 +45,7 @@ with open(filepath) as fp:
             scoutdata['Last Name'] = p[0]
           logging.debug("Scout Data: %s",scoutdata)
 
-       elif line.startswith("Position:"):
+       if line.startswith("Position:"):
           p = parse("Position: {} BSA ID: {}",line)
           if p is None:
              logging.error("No BSA ID for %s %s in line '%s', using 123",
@@ -51,78 +55,81 @@ with open(filepath) as fp:
              scoutdata['BSA Member ID'] = 123
           else:
              scoutdata['BSA Member ID'] = p[1]
+             phase = "partialrank"
           logging.debug("Scout Data: %s",scoutdata)
           num_processed += 1
-       elif line.startswith("Scout"):
+
+       if "partialrank" in phase and line.startswith("Scout"):
          scoutdata['Advancement Type'] = 'Scout Rank Requirement'
          scoutdata['Version'] = 2016
          logging.info("current rank: scout")
-       elif line.startswith("Tenderfoot"):
+
+       if line.startswith("Tenderfoot"):
          scoutdata['Advancement Type'] = 'Tenderfoot Rank Requirement'
          scoutdata['Version'] = 2016
          logging.info("current rank: tf")
-       elif line.startswith("Second Class"):
+
+       if line.startswith("Second Class"):
          scoutdata['Advancement Type'] = 'Second Class Rank Requirement'
          scoutdata['Version'] = 2016
          logging.info("current rank: sc")
-       elif line.startswith("First Class"):
+
+       if line.startswith("First Class"):
          scoutdata['Advancement Type'] = 'First Class Rank Requirement'
          scoutdata['Version'] = 2016
          logging.info("current rank: fc")
-       elif line.startswith("Star"):
-         scoutdata['Advancement Type'] = 'Star Scout Rank Requirement'
-         scoutdata['Version'] = 2016
-         logging.info("current rank: star")
-       elif line.startswith("Life"):
-         scoutdata['Advancement Type'] = 'Life Scout Rank Requirement'
-         scoutdata['Version'] = 2016
-         logging.info("current rank: life")
-       elif line.startswith("Eagle"):
-         scoutdata['Advancement Type'] = 'Eagle Scout Rank Requirement'
-         scoutdata['Version'] = 2016
-         logging.info("current rank: eagle")
+
+       # if we hit 'Star' we're done with partial rank stuff
+       if line.startswith("Star"):
+         logging.info("saw star, no more partial rank stuff..")
+         phase = "name" 
+         
        # if we've seen a rank, and are starting w a number, this is a partial rank requirement
-       elif line[0].isdigit():
-          print("line=",line)
-          if ('Advancement Type' in scoutdata.keys()):
-            # handle left column (or only column)
-            p = parse("{:.2}. {} {:.2}/{:.2}/{:.2} {}",line)
+       # or a date header...
+       if "partialrank" in phase and line[0].isdigit():
+          #p = parse("{2}/{2}/{2}",line)
+          #if p is not None:
+          #  continue
+
+          # handle left column (or only column)
+          p = parse("{:.2}. {} {:.2}/{:.2}/{:.2} {}",line)
+          if p is not None:
+            (req1, dd1, mm1, yy1, col2) = (p[0],p[2],p[3],p[4],p[5])
+          else:
+            logging.warning("couldn't parse double-col line, try single '%s'",line)
+            p = parse("{:.2}. {} {:.2}/{:.2}/{:.2}",line)
             if p is not None:
-              (req1, dd1, mm1, yy1, col2) = (p[0],p[2],p[3],p[4],p[5])
+              (req1, dd1, mm1, yy1) = (p[0],p[2],p[3],p[4])
             else:
-              logging.warning("couldn't parse double-col line, try single '%s'",line)
-              p = parse("{:.2}. {} {:.2}/{:.2}/{:.2}",line)
-              if p is not None:
-                (req1, dd1, mm1, yy1) = (p[0],p[2],p[3],p[4])
-            if "__" not in mm1:
-               logging.info("Found partial (left column) for %s: %s %s on date %s/%s/%s",
-                    scoutdata['First Name'], 
-                    scoutdata['Advancement Type'], 
-                    req1, dd1, mm1, yy1)
-               scoutdata['Date Complete'] = str(dd1)+"/"+str(mm1)+"/"+str(dd1)
-               scoutdata['Approved'] = "1"
-               scoutdata['Awarded'] = ""
-               scoutdata['Advancement'] = req1
-               num_partial_rank += 1
-               csvwriter.writerow(scoutdata)
+              logging.warning("couldn't parse line?! '%s'",line)
 
-            # handle right column (if exists)
-            p = parse("{:.2}. {} {:.2}/{:.2}/{:.2}",col2)
-            if p is not None:
-              (req2, dd2, mm2, yy2) = (p[0],p[2],p[3],p[4])
-              if "__" not in mm2:
-                logging.info("Found partial (right column) for %s: %s %s on date %s/%s/%s",
-                    scoutdata['First Name'], 
-                    scoutdata['Advancement Type'], 
-                    req2, dd2, mm2, yy2)
-                scoutdata['Date Complete'] = str(dd2)+"/"+str(mm2)+"/"+str(dd2)
-                scoutdata['Approved'] = "1"
-                scoutdata['Awarded'] = ""
-                scoutdata['Advancement'] = req2
-                num_partial_rank += 1
-                csvwriter.writerow(scoutdata)
+          if "__" not in mm1:
+              logging.info("Found partial (left column) for %s: %s %s on date %s/%s/%s",
+                  scoutdata['First Name'], 
+                  scoutdata['Advancement Type'], 
+                  req1, dd1, mm1, yy1)
+              scoutdata['Date Complete'] = str(dd1)+"/"+str(mm1)+"/"+str(dd1)
+              scoutdata['Approved'] = "1"
+              scoutdata['Awarded'] = ""
+              scoutdata['Advancement'] = req1
+              num_partial_rank += 1
+              csvwriter.writerow(scoutdata)
 
-
+          # handle right column (if exists)
+          p = parse("{:.2}. {} {:.2}/{:.2}/{:.2}",col2)
+          if p is not None:
+            (req2, dd2, mm2, yy2) = (p[0],p[2],p[3],p[4])
+            if "__" not in mm2:
+              logging.info("Found partial (right column) for %s: %s %s on date %s/%s/%s",
+                  scoutdata['First Name'], 
+                  scoutdata['Advancement Type'], 
+                  req2, dd2, mm2, yy2)
+              scoutdata['Date Complete'] = str(dd2)+"/"+str(mm2)+"/"+str(dd2)
+              scoutdata['Approved'] = "1"
+              scoutdata['Awarded'] = ""
+              scoutdata['Advancement'] = req2
+              num_partial_rank += 1
+              csvwriter.writerow(scoutdata)
 
    logging.info("%d Scouts found",num_scouts)
    logging.info("%d Scouts properly processed",num_processed)
