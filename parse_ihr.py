@@ -63,26 +63,26 @@ with open(filepath) as fp:
        if "partialrank" in phase and line.startswith("Scout"):
          scoutdata['Advancement Type'] = 'Scout Rank Requirement'
          scoutdata['Version'] = 2016
-         logging.info("current rank: scout")
+         logging.debug("current rank: scout")
 
        if line.startswith("Tenderfoot"):
          scoutdata['Advancement Type'] = 'Tenderfoot Rank Requirement'
          scoutdata['Version'] = 2016
-         logging.info("current rank: tf")
+         logging.debug("current rank: tf")
 
        if line.startswith("Second Class"):
          scoutdata['Advancement Type'] = 'Second Class Rank Requirement'
          scoutdata['Version'] = 2016
-         logging.info("current rank: sc")
+         logging.debug("current rank: sc")
 
        if line.startswith("First Class"):
          scoutdata['Advancement Type'] = 'First Class Rank Requirement'
          scoutdata['Version'] = 2016
-         logging.info("current rank: fc")
+         logging.debug("current rank: fc")
 
        # if we hit 'Star' we're done with partial rank stuff
        if line.startswith("Star"):
-         logging.info("saw star, no more partial rank stuff..")
+         logging.debug("saw star, no more partial rank stuff..")
          phase = "partialmb" 
          
        # if we've seen a rank, and are starting w a number, this is a partial rank requirement
@@ -97,7 +97,7 @@ with open(filepath) as fp:
           if p is not None:
             (req1, dd1, mm1, yy1, col2) = (p[0],p[2],p[3],p[4],p[5])
           else:
-            logging.warning("couldn't parse double-col line, try single '%s'",line)
+            logging.debug("couldn't parse double-col line, try single '%s'",line)
             p = parse("{:.2}. {} {:.2}/{:.2}/{:.2}",line)
             if p is not None:
               (req1, dd1, mm1, yy1) = (p[0],p[2],p[3],p[4])
@@ -105,7 +105,7 @@ with open(filepath) as fp:
               logging.warning("couldn't parse line?! '%s'",line)
 
           if "__" not in mm1:
-              logging.info("Found partial (left column) for %s: %s %s on date %s/%s/%s",
+              logging.debug("Found partial (left column) for %s: %s %s on date %s/%s/%s",
                   scoutdata['First Name'], 
                   scoutdata['Advancement Type'], 
                   req1, dd1, mm1, yy1)
@@ -121,7 +121,7 @@ with open(filepath) as fp:
           if p is not None:
             (req2, dd2, mm2, yy2) = (p[0],p[2],p[3],p[4])
             if "__" not in mm2:
-              logging.info("Found partial (right column) for %s: %s %s on date %s/%s/%s",
+              logging.debug("Found partial (right column) for %s: %s %s on date %s/%s/%s",
                   scoutdata['First Name'], 
                   scoutdata['Advancement Type'], 
                   req2, dd2, mm2, yy2)
@@ -157,23 +157,32 @@ with open(filepath) as fp:
            myre = re.compile(r'\w+')
            or_list = myre.findall(openreqts) # a list of ['1abc','2a','3',...]
            sb_or_list = [] # list of open requirements in sb format
-                           # 1 2a 2b 2c 9b[1] 9b[2] 
+                           # 1 2a 2b 2c 6b1 9b[1] 9b[2] 
+                           # Family Life has 6b1 but Archery has 2d[2]
            for openr in or_list:
              myre = re.compile(r'\w')
              char_list = myre.findall(openr)
              # 1
              if len(char_list)==1 and char_list[0].isdigit():
-               sb_or_list.append(char_list)
+               sb_or_list.append(char_list[0])
+
+             # 14
+             if len(char_list)==2 and char_list[0].isdigit() and char_list[1].isdigit():
+               sb_or_list.append(char_list[0]+char_list[1])
+
              # 2a or 2ab or 2abcdf
-             if (char_list[0].isdigit() and char_list[1:].isalpha()):
+             if (char_list[0].isdigit() and openr[1:].isalpha()):
                 for l in char_list[1:]:
                   sb_or_list.append(char_list[0]+l)
+
              #  6b5
              if len(char_list)==3 and char_list[0].isdigit() \
                                   and char_list[1].isalpha() \
                                   and char_list[2].isdigit():
-               sb_or_list.append(char_list)
-           logging.info("sb_or_lst=%s",sb_or_list)
+               sb_or_list.append(char_list[0]+char_list[1]+char_list[2])
+
+           logging.info("Open Requirements: %s",sb_or_list)
+           phase = "findpmb" # look for another partial merit badge
 
 
 
