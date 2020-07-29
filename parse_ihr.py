@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-import os, re
-from parse import *
-import csv
-import logging
-import read_mb
 
+import logging
 #logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-filepath = '../IndividualHistoryReport-103144_c.txt'
+
+import os, re
+from parse import *
+import csv
+import read_mb
+do_parse_mb = False # not working yet, too many inconsistencies between TM & SB
+
+
+filepath = '../IndividualHistoryReport-Alpha.txt'
 #filepath = '../JoeColin.txt'
 # filepath = 'ColinT_IHR.txt'
-filepathout = 'SB_IndividualHistoryReport.csv'
+filepathout = '../SB_IndividualHistoryReport.csv'
 
 
 # unwrap multiple-row "Open Reqts: lines"
@@ -25,7 +29,7 @@ mbdBase = read_mb.read_mb_dbase('all_mb_reqmts.csv')
 with open(filepath+'2') as fp:
  with open(filepathout,'w') as csvfile:
    fields = ['BSA Member ID','First Name', 'Middle Name', 'Last Name', 
-             'Advancement Type', 'Advancement', 'Version','Date Complete', 
+             'Advancement Type', 'Advancement', 'Version','Date Completed', 
              'Approved', 'Awarded']
    csvwriter = csv.DictWriter(csvfile, fieldnames=fields)
    csvwriter.writeheader()
@@ -93,7 +97,10 @@ with open(filepath+'2') as fp:
        # if we hit 'Star' we're done with partial rank stuff
        if line.startswith("Star"):
          logging.debug("saw star, no more partial rank stuff..")
-         phase = "partialmb" 
+         if do_parse_mb:
+           phase = "partialmb" 
+         else:
+           phase = "name"
          
        # if we've seen a rank, and are starting w a number, this is a partial rank requirement
        # or a date header...
@@ -119,7 +126,7 @@ with open(filepath+'2') as fp:
                   scoutdata['First Name'], 
                   scoutdata['Advancement Type'], 
                   req1, dd1, mm1, yy1)
-              scoutdata['Date Complete'] = str(dd1)+"/"+str(mm1)+"/"+str(dd1)
+              scoutdata['Date Complete'] = str(dd1)+"/"+str(mm1)+"/"+str(yy1)
               scoutdata['Approved'] = "1"
               scoutdata['Awarded'] = ""
               scoutdata['Advancement'] = req1
@@ -135,7 +142,7 @@ with open(filepath+'2') as fp:
                   scoutdata['First Name'], 
                   scoutdata['Advancement Type'], 
                   req2, dd2, mm2, yy2)
-              scoutdata['Date Complete'] = str(dd2)+"/"+str(mm2)+"/"+str(dd2)
+              scoutdata['Date Complete'] = str(dd2)+"/"+str(mm2)+"/"+str(yy2)
               scoutdata['Approved'] = "1"
               scoutdata['Awarded'] = ""
               scoutdata['Advancement'] = req2
